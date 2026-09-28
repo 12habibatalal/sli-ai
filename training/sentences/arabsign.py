@@ -44,6 +44,10 @@ def covered_sentences(vocab):
 
 def extract_one(path):
     import cv2
+
+    # mediapipe optionally imports TensorFlow (for doc helpers only); Kaggle's TensorFlow breaks
+    # on the protobuf mediapipe 0.10.14 needs, so make that optional import fail cleanly.
+    sys.modules.setdefault("tensorflow", None)
     import mediapipe as mp
 
     cap = cv2.VideoCapture(path)
