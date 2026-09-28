@@ -28,12 +28,24 @@ The SI dev signer is used for model selection; the SI test signers are evaluated
 
 ## Features
 
-Same landmark subset and normalisation as the app (`training/sli_kps.py`,
-`src/recognition/features.ts`): hands relative to their wrists, arms relative to the shoulders
-and scaled by shoulder width, the 136 face points in `training/face_idx.json`. Holistic's
-468-point face mesh is the first 468 points of the app's FaceLandmarker (478), and the pose and
-hand topologies are identical, so the features are the same. Frames are resampled to the app's
-frame rate. A parity fixture proves the TypeScript features match Python on Isharah samples.
+"Sentence features v1" (SF1), a variant of the word model's layout (`training/sli_kps.py`) that
+every source can produce. Isharah was extracted without iris refinement, so:
+
+- 176 points × (x, y) + 4 presence flags (pose, face, left hand, right hand) = 356 values/frame.
+- Pose: shoulders, elbows, wrists (11–16), relative to the left shoulder, scaled by shoulder
+  width (as the word model).
+- Face: the 128 non-iris points of `training/face_idx.json` (subset positions 0–127), relative to
+  subset point 1 (mesh 7), scaled by the outer eye corners (mesh 33–263) instead of the irises.
+- Hands: relative to the wrist, scaled by thumb-MCP–pinky-MCP (2–17), stored by the signer's
+  own side. The app assigns each hand to the nearest pose wrist (MediaPipe's handedness label
+  flips); Isharah (Holistic) is already by side; KArSL's stored slots are mapped by a measured
+  convention.
+- z is dropped (each source measures it differently).
+- Frames are resampled by timestamp to 15 fps.
+
+Holistic's 468-point face mesh is the first 468 points of the app's FaceLandmarker (478); pose
+and hand topologies are identical. KArSL's published 184×4 features convert to SF1 exactly
+(uniform rescale of the face). A parity fixture proves the TypeScript features match Python.
 
 ## Models
 
@@ -97,8 +109,8 @@ sentence, otherwise the glosses are shown joined. A translation model is out of 
   and reached through the shared `pricelens-proxy` with a vhost under `docker/nginx-upstreams`
   that points at `127.0.0.1:<port>` (never a container name), e.g. `/api/sentence` on the SLI
   site.
-- Input: the per-frame features for one sentence (a few KB). No video or images ever leave the
-  phone.
+- Input: the SF1 features for one sentence (float32, ≤ 450 frames = 30 s, ≤ 641 KB). No video
+  or images ever leave the phone.
 - Output: glosses, text, per-gloss confidence.
 - Limits: request size cap, one inference at a time per core (queue), per-IP rate limit,
   timeout; CPU capped so the other sites keep working. Stateless; nothing is stored.
