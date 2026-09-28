@@ -43,6 +43,22 @@ The recognition model is the MIT-licensed
 trained on [KArSL-502](https://hamzah-luqman.github.io/KArSL/) (Unified Arabic Sign Language: 31 numbers,
 39 letters and 432 words).
 
+## Sentence models
+
+Sentences mode reads a whole Saudi Sign Language sentence at once (CTC, trained on
+[Isharah-1000](https://www.kaggle.com/datasets/tfmohamedyahia/isharah-1000-pose), 672 signs, after pre-training on KArSL).
+Word error rate (WER) is measured on the Isharah signer-independent dev split, whose signer is never seen in training:
+
+| Model | Runs | Size | WER | One hand hidden | 1.5× faster | No face |
+| --- | --- | --- | --- | --- | --- | --- |
+| **SLI Sentences Large v1** (`large-v1`) | server, `POST /api/sentence` | 169 MB, 43M params | 17.6% | 19.1% | 16.9% | 18.8% |
+| **SLI Sentences Phone v1** (`sentences-small.onnx`) | in the browser, offline | 17.9 MB | 17.4% | 18.0% | 16.7% | 19.4% |
+
+The app sends each sentence to the server model and falls back to the phone model when the server
+is slow (4 s) or unreachable. The phone model learnt from a large teacher (distillation), so the two
+score about the same. For comparison, the best published Isharah signer-independent dev result is 17.9% (Swin-MSTP).
+Training rounds and stress tests: `training/sentences/rounds.md`. Licence of both models: CC-BY-NC-SA-4.0 (from Isharah).
+
 ## Measured accuracy
 
 On the KArSL **test** split (details and method in `training/README.md`):

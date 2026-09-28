@@ -14,6 +14,8 @@ import onnxruntime as ort
 
 DIM, MIN_T, MAX_T = 356, 8, 450
 QUEUE_WAIT_S = 4
+DRAIN_MAX = 2 << 20
+MODEL_ID, MODEL_NAME = "large-v1", "SLI Sentences Large v1"  # Isharah round 7: 17.6% WER on an unseen signer
 
 
 def greedy(lp):
@@ -57,7 +59,7 @@ def make_server(model, vocab_path, port=8000, workers=1):
 
         def do_GET(self):
             if self.path == "/api/sentence/health":
-                return self.reply(200, {"ok": True})
+                return self.reply(200, {"ok": True, "model": MODEL_ID, "name": MODEL_NAME})
             self.reply(404, {"error": "not found"})
 
         def do_POST(self):
@@ -66,6 +68,8 @@ def make_server(model, vocab_path, port=8000, workers=1):
             n = int(self.headers.get("Content-Length") or 0)
             if n > MAX_T * DIM * 4:
                 self.close_connection = True
+                if n <= DRAIN_MAX:  # read it, so a client still uploading gets the 413 and not a broken pipe
+                    self.rfile.read(n)
                 return self.reply(413, {"error": f"at most {MAX_T} frames"})
             body = self.rfile.read(n)
             if n % (DIM * 4) or n < MIN_T * DIM * 4:
@@ -85,7 +89,7 @@ def make_server(model, vocab_path, port=8000, workers=1):
             glosses = [vocab["glosses"][i - 1] for i in ids]
             key = " ".join(glosses)
             self.reply(200, {"ids": ids, "glosses": glosses, "text": vocab["lookup"].get(key, key),
-                             "conf": [round(c, 3) for c in conf], "ms": ms, "model": "large-v1"})
+                             "conf": [round(c, 3) for c in conf], "ms": ms, "model": MODEL_ID})
 
         def do_PUT(self):
             self.reply(405, {"error": "method not allowed"})
