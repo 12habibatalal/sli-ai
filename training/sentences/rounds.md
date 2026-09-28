@@ -16,3 +16,8 @@ signers, 1 dev signer (model selection), 4 test signers (evaluated once, at the 
 
 | Round | Date | Model | Change (one thing) | Epochs | Dev WER | Kaggle GPU h | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| 0 | 2026-09-28 | large | KArSL isolated-sign pre-training (502 signs) | 30 | 0.032 (KArSL test, seen signers) | 0.7 (baraasaad) | init for Isharah rounds |
+| 1 | 2026-09-28 | large | Isharah SI, init from round 0 | 60 | **0.262** | 1.8 (baraasaad) | train loss 48 -> 0.016 while dev flat from epoch ~40: overfits the 10 training signers |
+| 2 | 2026-09-28 | large | no pre-training (vs round 1) | 60 | 0.893 | 1.6 (mono768) | never leaves the all-blank solution (loss stuck ~5.2): pre-training is required |
+| 3 | 2026-09-28 | large | strong augmentation (vs round 1) | 60 | running | | rot 25/15, scale 0.3/0.2, speed 0.6-1.4, 2x longer/more hand drops |
+| 4 | 2026-09-28 | large | dropout 0.1 -> 0.3 (vs round 1) | 60 | running | | parallel with 3 on mono768 |
