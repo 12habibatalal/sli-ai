@@ -14,15 +14,17 @@ def _affine(pts, rng, rot, scale):
     return pts @ m.T
 
 
-# normal / strong (round 3: the model memorised its 10 training signers)
+# Augmentation levels. Round 1 memorised its 10 training signers; strong (round 3) cut dev WER
+# from 26.2 to 21.5, xstrong (round 5) pushes further along the same axis.
 AUG = {
-    False: dict(rot=(15, 10), scale=(0.2, 0.15), speed=(0.7, 1.3), drop_p=0.3, drop_len=8, drops=1),
-    True: dict(rot=(25, 15), scale=(0.3, 0.2), speed=(0.6, 1.4), drop_p=0.5, drop_len=16, drops=2),
+    "normal": dict(rot=(15, 10), scale=(0.2, 0.15), speed=(0.7, 1.3), drop_p=0.3, drop_len=8, drops=1),
+    "strong": dict(rot=(25, 15), scale=(0.3, 0.2), speed=(0.6, 1.4), drop_p=0.5, drop_len=16, drops=2),
+    "xstrong": dict(rot=(35, 20), scale=(0.4, 0.25), speed=(0.5, 1.5), drop_p=0.6, drop_len=22, drops=3),
 }
 
 
-def augment(x, rng, strong=False):
-    a = AUG[strong]
+def augment(x, rng, level="normal"):
+    a = AUG[level]
     x = x.astype(np.float32, copy=True)
     if rng.random() < 0.5:  # left-handed signers
         x = F.mirror(x)
@@ -78,8 +80,8 @@ def stress(x, kind, rng):
 
 
 class SeqDataset(torch.utils.data.Dataset):
-    def __init__(self, feats, items, train, seed=0, strong=False):
-        self.feats, self.items, self.train, self.strong = feats, items, train, strong
+    def __init__(self, feats, items, train, seed=0, level="normal"):
+        self.feats, self.items, self.train, self.level = feats, items, train, level
         self.rng = np.random.default_rng(seed)
 
     def __len__(self):
@@ -89,7 +91,7 @@ class SeqDataset(torch.utils.data.Dataset):
         key, ids = self.items[i]
         x = np.asarray(self.feats[key], np.float32)
         if self.train:
-            x = augment(x, self.rng, self.strong)
+            x = augment(x, self.rng, self.level)
         return torch.from_numpy(np.ascontiguousarray(x)), torch.tensor(ids, dtype=torch.long)
 
 

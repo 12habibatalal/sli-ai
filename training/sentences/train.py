@@ -54,9 +54,9 @@ def _seed_worker(worker_id):
 
 
 def fit(model, feats, items, dev_feats, dev_items, epochs, lr, max_frames, device, augment=True,
-        log=None, teacher=None, alpha=1.0, ckpt=None, meta=None, workers=0, strong=False):
+        log=None, teacher=None, alpha=1.0, ckpt=None, meta=None, workers=0, aug="normal"):
     model.to(device)
-    ds = D.SeqDataset(feats, items, train=augment, strong=strong)
+    ds = D.SeqDataset(feats, items, train=augment, level=aug)
     lengths = [len(feats[k]) for k, _ in items]
     rng = np.random.default_rng(0)
     steps = epochs * len(D.bucket_batches(lengths, max_frames, rng))
@@ -144,7 +144,7 @@ def main():
     ap.add_argument("--protocol", default="SI")
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--workers", type=int, default=3)
-    ap.add_argument("--aug", default="normal", choices=["normal", "strong"])
+    ap.add_argument("--aug", default="normal", choices=sorted(D.AUG))
     ap.add_argument("--dropout", type=float, default=0.1)
     ap.add_argument("--data")
     a = ap.parse_args()
@@ -190,7 +190,7 @@ def main():
     tr, dv = split("train"), split("dev")
     print(f"isharah {a.protocol}: {len(tr)} train, {len(dv)} dev, {C} classes", flush=True)
     fit(m, feats, tr, feats, dv, a.epochs, a.lr, a.max_frames, device, log=log, ckpt=ckpt, teacher=teacher,
-        alpha=a.alpha, workers=a.workers, strong=a.aug == "strong",
+        alpha=a.alpha, workers=a.workers, aug=a.aug,
         meta={"config": a.model, "arch": M.CONFIGS[a.model], "n_classes": C, "protocol": a.protocol,
               "aug": a.aug, "dropout": a.dropout})
     stress_report(m, ckpt, feats, dv, device, os.path.join(OUT, name + ".stress.json"))

@@ -38,7 +38,7 @@ def test_strong_augment_keeps_invariants_and_varies_more():
     r1, r2 = np.random.default_rng(3), np.random.default_rng(3)
     for _ in range(200):
         n = D.augment(sample(), r1)
-        s = D.augment(sample(), r2, strong=True)
+        s = D.augment(sample(), r2, level="strong")
         assert np.isfinite(s).all() and s.shape[1] == F.FEAT_DIM
         for o, k in ((F.O_LH, 2), (F.O_RH, 3)):
             assert not s[s[:, F.O_PRES + k] == 0, o:o + 42].any()
@@ -47,3 +47,16 @@ def test_strong_augment_keeps_invariants_and_varies_more():
         gone_s += int((s[:, F.O_PRES + 2:F.O_PRES + 4] == 0).sum())
     assert np.ptp(lens_s) > np.ptp(lens_n)  # wider speed range
     assert gone_s > 1.5 * gone_n  # more hidden-hand frames
+
+
+def test_xstrong_varies_more_than_strong():
+    lens_s, lens_x, gone_s, gone_x = [], [], 0, 0
+    r1, r2 = np.random.default_rng(5), np.random.default_rng(5)
+    for _ in range(200):
+        s = D.augment(sample(), r1, level="strong")
+        x = D.augment(sample(), r2, level="xstrong")
+        assert np.isfinite(x).all() and x.shape[1] == F.FEAT_DIM
+        lens_s.append(len(s)); lens_x.append(len(x))
+        gone_s += int((s[:, F.O_PRES + 2:F.O_PRES + 4] == 0).sum())
+        gone_x += int((x[:, F.O_PRES + 2:F.O_PRES + 4] == 0).sum())
+    assert np.ptp(lens_x) > np.ptp(lens_s) and gone_x > gone_s
