@@ -60,3 +60,16 @@ def test_xstrong_varies_more_than_strong():
         gone_s += int((s[:, F.O_PRES + 2:F.O_PRES + 4] == 0).sum())
         gone_x += int((x[:, F.O_PRES + 2:F.O_PRES + 4] == 0).sum())
     assert np.ptp(lens_x) > np.ptp(lens_s) and gone_x > gone_s
+
+
+def test_xxstrong_varies_more_than_xstrong():
+    lens_a, lens_b, gone_a, gone_b = [], [], 0, 0
+    r1, r2 = np.random.default_rng(7), np.random.default_rng(7)
+    for _ in range(200):
+        a = D.augment(sample(), r1, level="xstrong")
+        b = D.augment(sample(), r2, level="xxstrong")
+        assert np.isfinite(b).all() and b.shape[1] == F.FEAT_DIM
+        lens_a.append(len(a)); lens_b.append(len(b))
+        gone_a += int((a[:, F.O_PRES + 2:F.O_PRES + 4] == 0).sum())
+        gone_b += int((b[:, F.O_PRES + 2:F.O_PRES + 4] == 0).sum())
+    assert np.ptp(lens_b) > np.ptp(lens_a) and gone_b > gone_a

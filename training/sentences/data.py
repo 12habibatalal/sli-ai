@@ -20,6 +20,7 @@ AUG = {
     "normal": dict(rot=(15, 10), scale=(0.2, 0.15), speed=(0.7, 1.3), drop_p=0.3, drop_len=8, drops=1),
     "strong": dict(rot=(25, 15), scale=(0.3, 0.2), speed=(0.6, 1.4), drop_p=0.5, drop_len=16, drops=2),
     "xstrong": dict(rot=(35, 20), scale=(0.4, 0.25), speed=(0.5, 1.5), drop_p=0.6, drop_len=22, drops=3),
+    "xxstrong": dict(rot=(45, 25), scale=(0.5, 0.3), speed=(0.45, 1.6), drop_p=0.7, drop_len=26, drops=4),
 }
 
 
