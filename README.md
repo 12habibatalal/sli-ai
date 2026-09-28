@@ -51,7 +51,7 @@ Word error rate (WER) is measured on the Isharah signer-independent dev split, w
 
 | Model | Runs | Size | WER | One hand hidden | 1.5× faster | No face |
 | --- | --- | --- | --- | --- | --- | --- |
-| **SLI Sentences Large v1** (`large-v1`) | server, `POST /api/sentence` | 169 MB, 43M params | 17.6% | 19.1% | 16.9% | 18.8% |
+| **SLI Sentences Large v2** (`large-v2`) | server, `POST /api/sentence` | 169 MB, 43M params | 17.5% | 18.0% | 16.8% | 19.2% |
 | **SLI Sentences Phone v1** (`sentences-small.onnx`) | in the browser, offline | 17.9 MB | 17.4% | 18.0% | 16.7% | 19.4% |
 
 The app sends each sentence to the server model and falls back to the phone model when the server

@@ -15,7 +15,7 @@ import onnxruntime as ort
 DIM, MIN_T, MAX_T = 356, 8, 450
 QUEUE_WAIT_S = 4
 DRAIN_MAX = 2 << 20
-MODEL_ID, MODEL_NAME = "large-v1", "SLI Sentences Large v1"  # Isharah round 7: 17.6% WER on an unseen signer
+MODEL_ID, MODEL_NAME = "large-v2", "SLI Sentences Large v2"  # Isharah round 9: 17.5% WER on an unseen signer
 
 
 def greedy(lp):

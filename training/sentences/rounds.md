@@ -28,7 +28,7 @@ signers, 1 dev signer (model selection), 4 test signers (evaluated once, at the 
 | 7 | 2026-09-28 | large | xstrong, 100 epochs (vs round 5) | 100 | **0.1758** | 2.8 (baraasaad) | beats the 17.9 target; best large so far |
 | 8 | 2026-09-28 | large | xxstrong, 100 epochs (vs round 7) | 100 | 0.181 | 2.8 (mono768) | augmentation axis saturated (slightly better hidden hand); rot 45/25, scale 0.5/0.3, speed 0.45-1.6, 4 hand drops |
 | s2 | 2026-09-28 | small | distill from round 5 + xstrong augmentation | 80 | **0.1735** | 2.6 (selia097) | beats the 17.9 target and its own teacher (0.204) |
-| 9 | 2026-09-28 | large | self-distillation from round 5 + xstrong, 100 epochs | 100 | running | | selia097; s2 showed distillation regularises strongly |
+| 9 | 2026-09-28 | large | self-distillation from round 5 + xstrong, 100 epochs | 100 | **0.1745** | 2.1 (selia097) | best large: sentence accuracy 67.2% vs 64.5% (round 7); served as SLI Sentences Large v2 |
 
 ## Stress tests (dev WER: plain / one hand hidden 0.5-1.5 s, ~1/3 of frames / 1.5x faster)
 
@@ -43,6 +43,7 @@ signers, 1 dev signer (model selection), 4 test signers (evaluated once, at the 
 | s2 | 0.173 | 0.180 | 0.167 |
 | 7 | 0.176 | 0.191 | 0.169 |
 | 8 | 0.181 | 0.185 | 0.178 |
+| 9 | 0.1745 | 0.180 | 0.168 |
 
 ## No face (signer far from the camera; the app's FaceLandmarker misses small faces)
 
@@ -54,5 +55,6 @@ almost always has a face. Cost of losing the face entirely (dev WER, exported ON
 | --- | --- | --- |
 | large r7 | 0.1758 | 0.1875 |
 | small s2 | 0.1735 | 0.1940 |
+| large r9 | 0.1745 | 0.1917 |
 
 1-2 points: no special retraining. The e2e camera uses phone-like framing.
