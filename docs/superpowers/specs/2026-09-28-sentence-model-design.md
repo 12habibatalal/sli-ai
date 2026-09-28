@@ -5,8 +5,10 @@ Date: 2026-09-28. Status: approved in conversation, awaiting spec review.
 ## Goal
 
 Recognise continuous signing (whole sentences signed without pauses) from people the model has
-never seen, running in the browser like the current word model, and publish the model on
-Hugging Face.
+never seen, with two models, and publish both on Hugging Face:
+
+- **Large** (server): no size limit; runs on the pricelens server behind an API. Most accurate.
+- **Small** (phone): ONNX ≤ 20 MB, downloaded by the app and run in the browser, offline.
 
 "Works on new videos" is defined and measured as: word error rate (WER) on signers held out of
 training. The model recognises the ~685 glosses of Isharah-1000 (plus KArSL signs used for
@@ -33,7 +35,23 @@ and scaled by shoulder width, the 136 face points in `training/face_idx.json`. H
 hand topologies are identical, so the features are the same. Frames are resampled to the app's
 frame rate. A parity fixture proves the TypeScript features match Python on Isharah samples.
 
-## Model
+## Models
+
+Both are landmark models with the same features, vocabulary and CTC output.
+
+### Large (server)
+
+- Deeper/wider Transformer encoder with CTC head; size chosen by dev WER, not by file size.
+- Hard limit is latency, not size: one sentence (≈20 s of signing) must decode in ≤ 2 s on one
+  core of the pricelens server (2× Neoverse-N1, no GPU), so it does not slow the other sites.
+  Checked with ONNX Runtime on the server before release; if it is too slow, the next smaller
+  size that meets the limit is used.
+
+### Small (phone)
+
+- Distilled from the large model (trained on its outputs plus the true labels).
+
+### Both
 
 - Transformer encoder over per-frame features (temporal downsampling ×2), CTC head over the
   gloss vocabulary + blank.
@@ -42,7 +60,7 @@ frame rate. A parity fixture proves the TypeScript features match Python on Isha
 - Augmentation aimed at unseen signers: body scale/aspect, small rotations, left/right mirroring
   (with hand swap), speed change 0.7–1.3×, random landmark/hand dropout, jitter.
 - Selection: lowest WER on SI dev; greedy CTC decoding (beam search tried, kept only if it helps).
-- Budget: ONNX file ≤ 20 MB (int8 quantisation if needed), fast enough for a phone browser.
+- Small model budget: ONNX file ≤ 20 MB (int8 quantisation if needed), fast enough for a phone browser.
 
 ## Training infrastructure
 
@@ -61,6 +79,8 @@ rounds stop improving dev WER, whichever comes first — then run the final test
 
 ## Evaluation (reported in `src/data/metrics.json`, README and model card)
 
+Every number is reported for both models.
+
 - WER on SI test (4 unseen signers) — headline number.
 - WER on US test (unseen sentences).
 - WER / sentence accuracy on ArabSign (different dataset, different people).
@@ -71,15 +91,29 @@ rounds stop improving dev WER, whichever comes first — then run the final test
 A lookup from gloss sequences to Isharah's written sentences: an exact match shows the
 sentence, otherwise the glosses are shown joined. A translation model is out of scope.
 
+## Server API (large model)
+
+- Small Python service (ONNX Runtime) in a container on pricelens, published on a loopback port
+  and reached through the shared `pricelens-proxy` with a vhost under `docker/nginx-upstreams`
+  that points at `127.0.0.1:<port>` (never a container name), e.g. `/api/sentence` on the SLI
+  site.
+- Input: the per-frame features for one sentence (a few KB). No video or images ever leave the
+  phone.
+- Output: glosses, text, per-gloss confidence.
+- Limits: request size cap, one inference at a time per core (queue), per-IP rate limit,
+  timeout; CPU capped so the other sites keep working. Stateless; nothing is stored.
+
 ## App
 
-New "Sentences" mode: rolling window of frames → ONNX model in the existing recognition worker →
-CTC decode → glosses and text on screen. Reuses the MediaPipe worker and framing coach.
-Tests: unit (features parity, CTC decoding), replay (vitest), e2e (Playwright, as for words).
+New "Sentences" mode: rolling window of frames → features (existing MediaPipe worker) → large
+model through the API when online; small model in the recognition worker when offline or when
+the API is slow or unavailable. CTC decode → glosses and text on screen. Reuses the framing
+coach. Tests: unit (features parity, CTC decoding), replay (vitest) for both models, API tests
+(latency, limits, fallback), e2e (Playwright, as for words).
 
 ## Hugging Face release
 
-Model repo under the user's account: ONNX model, feature spec, gloss vocabulary, lookup table,
+Model repo under the user's account with both models (large and small ONNX), feature spec, gloss vocabulary, lookup table,
 metrics, model card (intended use, limits: vocabulary, Saudi Sign Language, unseen-signer WER),
 licence CC-BY-NC-SA-4.0, citations for Isharah, KArSL, the MIT ST-Transformer and pose-format.
 Only weights and metadata are published, never videos or landmarks. Requires a Hugging Face
