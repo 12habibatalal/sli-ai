@@ -26,3 +26,10 @@ def test_unpacks_to_a_writable_dir(tmp_path):
     K.write_kernel(tmp_path, "hello", "training.sentences.hello", gpu=False, datasets=[], kernels=[])
     run = (tmp_path / "run.py").read_text()
     assert '"/kaggle/src"' not in run and '"/tmp/sli"' in run
+
+
+def test_other_account(tmp_path):
+    K.write_kernel(tmp_path, "r2", "training.sentences.train", gpu=True, datasets=[], kernels=[], user="selia097")
+    assert json.load(open(tmp_path / "kernel-metadata.json"))["id"] == "selia097/sli-sent-r2"
+    env = K.account_env(2)
+    assert env["KAGGLE_API_TOKEN"].startswith("KGAT_") and K.ACCOUNTS[2][0] == "selia097"

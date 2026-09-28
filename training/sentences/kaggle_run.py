@@ -19,6 +19,19 @@ import time
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 KAGGLE = os.path.expanduser("~/sli-work/kvenv/bin/kaggle")
 USER = "baraasaad"
+# --account N: (username, token file). 2 and 3 are teammates' accounts lent to the project.
+ACCOUNTS = {
+    1: (USER, "~/.kaggle/access_token"),
+    2: ("selia097", "~/.kaggle-t2/access_token"),
+    3: ("mono768", "~/.kaggle-t3/access_token"),
+}
+
+
+def account_env(n):
+    """Environment for the kaggle CLI acting as account n."""
+    env = dict(os.environ)
+    env["KAGGLE_API_TOKEN"] = open(os.path.expanduser(ACCOUNTS[n][1])).read().strip()
+    return env
 PIP = "pose-format onnx onnxruntime"
 
 # /kaggle/src (where the script lives) is read-only, so the code is unpacked into /tmp/sli.
@@ -44,9 +57,9 @@ def bundle():
     return base64.b64encode(buf.getvalue()).decode()
 
 
-def write_kernel(d, name, entry, gpu, datasets, kernels, args=""):
+def write_kernel(d, name, entry, gpu, datasets, kernels, args="", user=USER):
     os.makedirs(d, exist_ok=True)
-    meta = {"id": f"{USER}/sli-sent-{name}", "title": f"sli-sent-{name}", "code_file": "run.py",
+    meta = {"id": f"{user}/sli-sent-{name}", "title": f"sli-sent-{name}", "code_file": "run.py",
             "language": "python", "kernel_type": "script", "is_private": True, "enable_gpu": gpu,
             "enable_internet": True, "dataset_sources": datasets, "kernel_sources": kernels,
             "competition_sources": []}
@@ -63,8 +76,8 @@ def find_input(pattern):
     return hits[0]
 
 
-def status(slug):
-    out = subprocess.run([KAGGLE, "kernels", "status", slug], capture_output=True, text=True)
+def status(slug, env=None):
+    out = subprocess.run([KAGGLE, "kernels", "status", slug], capture_output=True, text=True, env=env)
     text = (out.stdout + out.stderr).lower()
     for s in ("complete", "error", "cancel", "running", "queued"):
         if s in text:
@@ -82,20 +95,24 @@ def main():
     ap.add_argument("--args", default="")
     ap.add_argument("--wait", action="store_true")
     ap.add_argument("--pull")
+    ap.add_argument("--pattern", default=r"(\.json|\.log|\.pt|\.onnx)$", help="output files to pull")
+    ap.add_argument("--account", type=int, default=1, choices=sorted(ACCOUNTS))
     a = ap.parse_args()
-    d = os.path.expanduser(f"~/sli-work/kaggle/{a.name}")
-    write_kernel(d, a.name, a.entry, a.gpu, a.datasets, a.kernels, a.args)
-    subprocess.run([KAGGLE, "kernels", "push", "-p", d], check=True)
-    slug = f"{USER}/sli-sent-{a.name}"
+    user, env = ACCOUNTS[a.account][0], account_env(a.account)
+    d = os.path.expanduser(f"~/sli-work/kaggle/{user}/{a.name}")
+    write_kernel(d, a.name, a.entry, a.gpu, a.datasets, a.kernels, a.args, user=user)
+    subprocess.run([KAGGLE, "kernels", "push", "-p", d], check=True, env=env)
+    slug = f"{user}/sli-sent-{a.name}"
     while a.wait:
         time.sleep(60)
-        s = status(slug)
+        s = status(slug, env)
         print(time.strftime("%H:%M"), s, flush=True)
         if s in ("complete", "error", "cancel"):
             break
     if a.pull:
         os.makedirs(a.pull, exist_ok=True)
-        subprocess.run([KAGGLE, "kernels", "output", slug, "-p", a.pull, "-o"], check=False)
+        subprocess.run([KAGGLE, "kernels", "output", slug, "-p", a.pull, "-o", "--file-pattern", a.pattern],
+                       check=False, env=env)
 
 
 if __name__ == "__main__":
