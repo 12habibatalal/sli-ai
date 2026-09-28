@@ -14,25 +14,34 @@ def _affine(pts, rng, rot, scale):
     return pts @ m.T
 
 
-def augment(x, rng):
+# normal / strong (round 3: the model memorised its 10 training signers)
+AUG = {
+    False: dict(rot=(15, 10), scale=(0.2, 0.15), speed=(0.7, 1.3), drop_p=0.3, drop_len=8, drops=1),
+    True: dict(rot=(25, 15), scale=(0.3, 0.2), speed=(0.6, 1.4), drop_p=0.5, drop_len=16, drops=2),
+}
+
+
+def augment(x, rng, strong=False):
+    a = AUG[strong]
     x = x.astype(np.float32, copy=True)
     if rng.random() < 0.5:  # left-handed signers
         x = F.mirror(x)
     T = len(x)
     for o, n, k in PARTS:  # body proportions, camera angle and aspect ratio, landmark noise
         pts = x[:, o:o + 2 * n].reshape(T, n, 2)
-        rot, scale = (15, 0.2) if k == 0 else (10, 0.15)
-        pts = _affine(pts, rng, rot, scale) + rng.normal(0, 0.01, pts.shape)
+        i = 0 if k == 0 else 1
+        pts = _affine(pts, rng, a["rot"][i], a["scale"][i]) + rng.normal(0, 0.01, pts.shape)
         x[:, o:o + 2 * n] = pts.reshape(T, -1) * x[:, [F.O_PRES + k]]
-    speed = rng.uniform(0.7, 1.3)  # signing speed
+    speed = rng.uniform(*a["speed"])  # signing speed
     x = F.resample(x, np.arange(T) * speed * 1000.0 / F.FPS)
     T = len(x)
-    for o, n, k in PARTS[2:]:  # short hand tracking losses
-        if rng.random() < 0.3:
-            s = rng.integers(0, T)
-            e = min(T, s + rng.integers(1, 8))
-            x[s:e, o:o + 2 * n] = 0
-            x[s:e, F.O_PRES + k] = 0
+    for o, n, k in PARTS[2:]:  # hand tracking losses (fast motion, one hand behind the other)
+        for _ in range(a["drops"]):
+            if rng.random() < a["drop_p"]:
+                s = rng.integers(0, T)
+                e = min(T, s + rng.integers(1, a["drop_len"]))
+                x[s:e, o:o + 2 * n] = 0
+                x[s:e, F.O_PRES + k] = 0
     if rng.random() < 0.05:  # face not found at all
         x[:, F.O_FACE:F.O_FACE + 256] = 0
         x[:, F.O_PRES + 1] = 0
@@ -69,8 +78,8 @@ def stress(x, kind, rng):
 
 
 class SeqDataset(torch.utils.data.Dataset):
-    def __init__(self, feats, items, train, seed=0):
-        self.feats, self.items, self.train = feats, items, train
+    def __init__(self, feats, items, train, seed=0, strong=False):
+        self.feats, self.items, self.train, self.strong = feats, items, train, strong
         self.rng = np.random.default_rng(seed)
 
     def __len__(self):
@@ -80,7 +89,7 @@ class SeqDataset(torch.utils.data.Dataset):
         key, ids = self.items[i]
         x = np.asarray(self.feats[key], np.float32)
         if self.train:
-            x = augment(x, self.rng)
+            x = augment(x, self.rng, self.strong)
         return torch.from_numpy(np.ascontiguousarray(x)), torch.tensor(ids, dtype=torch.long)
 
 

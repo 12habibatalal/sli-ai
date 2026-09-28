@@ -44,3 +44,8 @@ def test_attention_matches_torch_multihead_attention():
     mask = torch.tensor([[False] * 9, [False] * 6 + [True] * 3])
     want = ref(x, x, x, key_padding_mask=mask, need_weights=False)[0]
     assert torch.allclose(att(x, mask), want, atol=1e-5)
+
+
+def test_build_takes_dropout():
+    m = M.build("small", 10, dropout=0.3)
+    assert m.blocks[0].drop.p == 0.3 and m.blocks[0].att.dropout == 0.3

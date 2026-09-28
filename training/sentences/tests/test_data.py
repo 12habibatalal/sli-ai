@@ -31,3 +31,19 @@ def test_collate_and_buckets():
     b = D.bucket_batches(lengths, max_frames=640, rng=rng)
     assert sorted(i for bb in b for i in bb) == [0, 1, 2, 3, 4]
     assert all(max(lengths[i] for i in bb) * len(bb) <= 640 for bb in b)
+
+
+def test_strong_augment_keeps_invariants_and_varies_more():
+    lens_n, lens_s, gone_n, gone_s = [], [], 0, 0
+    r1, r2 = np.random.default_rng(3), np.random.default_rng(3)
+    for _ in range(200):
+        n = D.augment(sample(), r1)
+        s = D.augment(sample(), r2, strong=True)
+        assert np.isfinite(s).all() and s.shape[1] == F.FEAT_DIM
+        for o, k in ((F.O_LH, 2), (F.O_RH, 3)):
+            assert not s[s[:, F.O_PRES + k] == 0, o:o + 42].any()
+        lens_n.append(len(n)); lens_s.append(len(s))
+        gone_n += int((n[:, F.O_PRES + 2:F.O_PRES + 4] == 0).sum())
+        gone_s += int((s[:, F.O_PRES + 2:F.O_PRES + 4] == 0).sum())
+    assert np.ptp(lens_s) > np.ptp(lens_n)  # wider speed range
+    assert gone_s > 1.5 * gone_n  # more hidden-hand frames

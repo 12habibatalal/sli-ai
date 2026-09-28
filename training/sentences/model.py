@@ -91,5 +91,5 @@ class SignCTC(nn.Module):
         return self.head(h).log_softmax(-1), out_len
 
 
-def build(name, n_classes):
-    return SignCTC(n_classes, **CONFIGS[name])
+def build(name, n_classes, dropout=0.1):
+    return SignCTC(n_classes, **CONFIGS[name], dropout=dropout)

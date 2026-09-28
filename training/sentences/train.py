@@ -54,9 +54,9 @@ def _seed_worker(worker_id):
 
 
 def fit(model, feats, items, dev_feats, dev_items, epochs, lr, max_frames, device, augment=True,
-        log=None, teacher=None, alpha=1.0, ckpt=None, meta=None, workers=0):
+        log=None, teacher=None, alpha=1.0, ckpt=None, meta=None, workers=0, strong=False):
     model.to(device)
-    ds = D.SeqDataset(feats, items, train=augment)
+    ds = D.SeqDataset(feats, items, train=augment, strong=strong)
     lengths = [len(feats[k]) for k, _ in items]
     rng = np.random.default_rng(0)
     steps = epochs * len(D.bucket_batches(lengths, max_frames, rng))
@@ -133,7 +133,7 @@ def _resolve(path):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--stage", required=True, choices=["karsl", "isharah", "distill"])
+    ap.add_argument("--stage", required=True, choices=["karsl", "isharah", "distill", "stress"])
     ap.add_argument("--model", default="large")
     ap.add_argument("--init")
     ap.add_argument("--teacher")
@@ -144,6 +144,8 @@ def main():
     ap.add_argument("--protocol", default="SI")
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--workers", type=int, default=3)
+    ap.add_argument("--aug", default="normal", choices=["normal", "strong"])
+    ap.add_argument("--dropout", type=float, default=0.1)
     ap.add_argument("--data")
     a = ap.parse_args()
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -168,7 +170,13 @@ def main():
         return [(r["id"], encode(vocab, r["gloss"])) for r in rows][:lim]
 
     C = len(vocab["glosses"]) + 1
-    m = M.build(a.model, C)
+    if a.stage == "stress":  # stress tests of an existing checkpoint (--init) on the dev split
+        c = torch.load(_resolve(a.init), map_location="cpu")
+        m = M.SignCTC(C, **(c.get("arch") or M.CONFIGS[c["config"]]))
+        stress_report(m, _resolve(a.init), feats, split("dev"), device,
+                      os.path.join(OUT, os.path.basename(a.init)[:-3] + ".stress.json"))
+        return
+    m = M.build(a.model, C, dropout=a.dropout)
     if a.init:
         state = torch.load(_resolve(a.init), map_location="cpu")["state"]
         state = {k: v for k, v in state.items() if not k.startswith("head.")}
@@ -182,8 +190,9 @@ def main():
     tr, dv = split("train"), split("dev")
     print(f"isharah {a.protocol}: {len(tr)} train, {len(dv)} dev, {C} classes", flush=True)
     fit(m, feats, tr, feats, dv, a.epochs, a.lr, a.max_frames, device, log=log, ckpt=ckpt, teacher=teacher,
-        alpha=a.alpha, workers=a.workers,
-        meta={"config": a.model, "arch": M.CONFIGS[a.model], "n_classes": C, "protocol": a.protocol})
+        alpha=a.alpha, workers=a.workers, strong=a.aug == "strong",
+        meta={"config": a.model, "arch": M.CONFIGS[a.model], "n_classes": C, "protocol": a.protocol,
+              "aug": a.aug, "dropout": a.dropout})
     stress_report(m, ckpt, feats, dv, device, os.path.join(OUT, name + ".stress.json"))
 
 
