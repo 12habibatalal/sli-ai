@@ -3,7 +3,8 @@
 Thanks for helping. SLI is useful only if it understands real signers, so better models, bug
 reports from Deaf signers and new data matter as much as code.
 
-- **Bugs and ideas:** open an issue. For recognition errors, say which mode (Auto, Words, Letters,
+- **Questions and ideas:** start a [discussion](https://github.com/Digital-Fingers-Team/sli-ai/discussions).
+- **Bugs:** open an issue. For recognition errors, say which mode (Auto, Words, Letters,
   Sentences), what you signed and what came out, and your device and browser.
 - **Code:** open a pull request against `main`. Keep it to one change and say how you tested it.
 - **Models:** see [Improving the sentence models](#improving-the-sentence-models) below.
