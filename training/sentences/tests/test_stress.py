@@ -27,3 +27,11 @@ def test_hidden_hand_removes_about_a_third_of_one_hands_frames_in_long_stretches
 def test_fast_is_one_and_a_half_times_shorter():
     y = V.stress(clip(150), "fast", np.random.default_rng(0))
     assert len(y) == 100
+
+
+def test_noface_removes_the_whole_face_only():
+    x = clip(60)
+    y = V.stress(x, "noface", np.random.default_rng(0))
+    assert not y[:, F.O_FACE:F.O_FACE + 256].any() and not y[:, F.O_PRES + 1].any()
+    assert np.array_equal(np.delete(y, np.r_[F.O_FACE:F.O_FACE + 256, F.O_PRES + 1], axis=1),
+                          np.delete(x, np.r_[F.O_FACE:F.O_FACE + 256, F.O_PRES + 1], axis=1))

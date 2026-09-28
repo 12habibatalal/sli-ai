@@ -40,7 +40,7 @@ if __name__ == "__main__":
     ap.add_argument("--protocol", default="SI")
     ap.add_argument("--part", default="dev")
     ap.add_argument("--data")
-    ap.add_argument("--stress", nargs="*", default=[], choices=["hand", "fast"],
+    ap.add_argument("--stress", nargs="*", default=[], choices=["hand", "fast", "noface"],
                     help="also report WER with a hand hidden in stretches / signing 1.5x faster")
     a = ap.parse_args()
     feats, index, vocab = load_ish(a.data)

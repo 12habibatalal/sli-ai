@@ -56,12 +56,18 @@ def stress(x, kind, rng):
 
     hand: one hand at a time disappears for 0.5-1.5 s stretches covering about a third of the
           clip, as when a hand passes behind the other (the arms stay tracked);
-    fast: the same signing 1.5 times faster.
+    fast: the same signing 1.5 times faster;
+    noface: no face at all, as when the signer is far from the camera (the app's FaceLandmarker
+            misses small faces; Holistic, used for the training data, almost never does).
     """
     x = np.array(x, np.float32, copy=True)
     T = len(x)
     if kind == "fast":
         return F.resample(x, np.arange(T) * (1000.0 / F.FPS) / 1.5)
+    if kind == "noface":
+        x[:, F.O_FACE:F.O_FACE + 256] = 0
+        x[:, F.O_PRES + 1] = 0
+        return x
     if kind != "hand":
         raise ValueError(kind)
     hidden = np.zeros(T, bool)

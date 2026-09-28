@@ -39,7 +39,7 @@ def stress_report(model, ckpt, feats, items, device, out_path):
     model.load_state_dict(torch.load(ckpt, map_location="cpu")["state"])
     model.to(device)
     report = {"plain": evaluate_split(model, feats, items, device)}
-    for kind in ("hand", "fast"):
+    for kind in ("hand", "fast", "noface"):
         rng = np.random.default_rng(0)
         hard = {k: D.stress(np.asarray(feats[k], np.float32), kind, rng) for k, _ in items}
         report[kind] = evaluate_split(model, hard, items, device)
