@@ -1,0 +1,80 @@
+"""Training data: SF1 sequences, augmentation aimed at unseen signers and cameras, batching."""
+import numpy as np
+import torch
+
+from training.sentences import feats as F
+
+PARTS = [(F.O_POSE, 6, 0), (F.O_FACE, 128, 1), (F.O_LH, 21, 2), (F.O_RH, 21, 3)]  # offset, points, flag
+
+
+def _affine(pts, rng, rot, scale):
+    a = np.deg2rad(rng.uniform(-rot, rot))
+    sx, sy = rng.uniform(1 - scale, 1 + scale, 2)
+    m = np.array([[np.cos(a), -np.sin(a)], [np.sin(a), np.cos(a)]]) @ np.diag([sx, sy])
+    return pts @ m.T
+
+
+def augment(x, rng):
+    x = x.astype(np.float32, copy=True)
+    if rng.random() < 0.5:  # left-handed signers
+        x = F.mirror(x)
+    T = len(x)
+    for o, n, k in PARTS:  # body proportions, camera angle and aspect ratio, landmark noise
+        pts = x[:, o:o + 2 * n].reshape(T, n, 2)
+        rot, scale = (15, 0.2) if k == 0 else (10, 0.15)
+        pts = _affine(pts, rng, rot, scale) + rng.normal(0, 0.01, pts.shape)
+        x[:, o:o + 2 * n] = pts.reshape(T, -1) * x[:, [F.O_PRES + k]]
+    speed = rng.uniform(0.7, 1.3)  # signing speed
+    x = F.resample(x, np.arange(T) * speed * 1000.0 / F.FPS)
+    T = len(x)
+    for o, n, k in PARTS[2:]:  # short hand tracking losses
+        if rng.random() < 0.3:
+            s = rng.integers(0, T)
+            e = min(T, s + rng.integers(1, 8))
+            x[s:e, o:o + 2 * n] = 0
+            x[s:e, F.O_PRES + k] = 0
+    if rng.random() < 0.05:  # face not found at all
+        x[:, F.O_FACE:F.O_FACE + 256] = 0
+        x[:, F.O_PRES + 1] = 0
+    return x
+
+
+class SeqDataset(torch.utils.data.Dataset):
+    def __init__(self, feats, items, train, seed=0):
+        self.feats, self.items, self.train = feats, items, train
+        self.rng = np.random.default_rng(seed)
+
+    def __len__(self):
+        return len(self.items)
+
+    def __getitem__(self, i):
+        key, ids = self.items[i]
+        x = np.asarray(self.feats[key], np.float32)
+        if self.train:
+            x = augment(x, self.rng)
+        return torch.from_numpy(np.ascontiguousarray(x)), torch.tensor(ids, dtype=torch.long)
+
+
+def collate(batch):
+    xs, ys = zip(*batch)
+    xl = torch.tensor([len(x) for x in xs])
+    x = torch.zeros(len(xs), int(xl.max()), F.FEAT_DIM)
+    for i, v in enumerate(xs):
+        x[i, : len(v)] = v
+    return x, xl, torch.cat(ys), torch.tensor([len(y) for y in ys])
+
+
+def bucket_batches(lengths, max_frames, rng):
+    """Batches of similar length whose padded size (longest x count) stays within max_frames."""
+    order = sorted(range(len(lengths)), key=lambda i: lengths[i])
+    batches, cur, longest = [], [], 0
+    for i in order:
+        if cur and max(longest, lengths[i]) * (len(cur) + 1) > max_frames:
+            batches.append(cur)
+            cur, longest = [], 0
+        cur.append(i)
+        longest = max(longest, lengths[i])
+    if cur:
+        batches.append(cur)
+    rng.shuffle(batches)
+    return batches
