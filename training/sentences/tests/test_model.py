@@ -31,3 +31,16 @@ def test_shapes_and_padding_invariance(name):
 def test_small_is_under_20mb():
     n = sum(p.numel() for p in M.build("small", 700).parameters())
     assert n * 4 < 20e6
+
+
+def test_attention_matches_torch_multihead_attention():
+    # same parameter names and numbers as nn.MultiheadAttention (older checkpoints load)
+    torch.manual_seed(0)
+    ref = torch.nn.MultiheadAttention(32, 4, batch_first=True).eval()
+    att = M.SelfAttention(32, 4, 0.0).eval()
+    assert set(att.state_dict()) == set(ref.state_dict())
+    att.load_state_dict(ref.state_dict())
+    x = torch.randn(2, 9, 32)
+    mask = torch.tensor([[False] * 9, [False] * 6 + [True] * 3])
+    want = ref(x, x, x, key_padding_mask=mask, need_weights=False)[0]
+    assert torch.allclose(att(x, mask), want, atol=1e-5)

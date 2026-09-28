@@ -26,12 +26,35 @@ class ConvModule(nn.Module):
         return x + self.drop(self.pw2(y))
 
 
+class SelfAttention(nn.Module):
+    """Multi-head self-attention with nn.MultiheadAttention's parameter names (checkpoints load
+    either way) but shape-agnostic reshapes, so the ONNX export works for any length."""
+
+    def __init__(self, d, heads, dropout):
+        super().__init__()
+        self.heads, self.dropout = heads, dropout
+        self.in_proj_weight = nn.Parameter(torch.empty(3 * d, d))
+        self.in_proj_bias = nn.Parameter(torch.zeros(3 * d))
+        self.out_proj = nn.Linear(d, d)
+        nn.init.xavier_uniform_(self.in_proj_weight)
+        nn.init.zeros_(self.out_proj.bias)
+
+    def forward(self, x, mask):  # mask: [B, T], True = padding
+        B, _, d = x.shape
+        qkv = nn.functional.linear(x, self.in_proj_weight, self.in_proj_bias)
+        q, k, v = qkv.reshape(B, -1, 3, self.heads, d // self.heads).permute(2, 0, 3, 1, 4)
+        keep = ~mask[:, None, None, :]
+        y = nn.functional.scaled_dot_product_attention(q, k, v, attn_mask=keep,
+                                                       dropout_p=self.dropout if self.training else 0.0)
+        return self.out_proj(y.transpose(1, 2).reshape(B, -1, d))
+
+
 class Block(nn.Module):
     def __init__(self, d, heads, ff, conv, dropout):
         super().__init__()
         self.ff1 = nn.Sequential(nn.LayerNorm(d), nn.Linear(d, ff), nn.SiLU(), nn.Dropout(dropout), nn.Linear(ff, d))
         self.norm_att = nn.LayerNorm(d)
-        self.att = nn.MultiheadAttention(d, heads, dropout=dropout, batch_first=True)
+        self.att = SelfAttention(d, heads, dropout)
         self.conv = ConvModule(d, conv, dropout)
         self.ff2 = nn.Sequential(nn.LayerNorm(d), nn.Linear(d, ff), nn.SiLU(), nn.Dropout(dropout), nn.Linear(ff, d))
         self.norm_out = nn.LayerNorm(d)
@@ -40,7 +63,7 @@ class Block(nn.Module):
     def forward(self, x, mask):
         x = x + 0.5 * self.drop(self.ff1(x))
         a = self.norm_att(x)
-        x = x + self.drop(self.att(a, a, a, key_padding_mask=mask, need_weights=False)[0])
+        x = x + self.drop(self.att(a, mask))
         x = self.conv(x, mask)
         x = x + 0.5 * self.drop(self.ff2(x))
         return self.norm_out(x)
