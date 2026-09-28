@@ -27,7 +27,8 @@ signers, 1 dev signer (model selection), 4 test signers (evaluated once, at the 
 | s1 | 2026-09-28 | small | Isharah, init s0, normal augmentation (plain baseline) | 60 | 0.268 | 1.5 (selia097) | baseline for distillation |
 | 7 | 2026-09-28 | large | xstrong, 100 epochs (vs round 5) | 100 | running | | baraasaad |
 | 8 | 2026-09-28 | large | xxstrong, 100 epochs (vs round 7) | 100 | running | | mono768; rot 45/25, scale 0.5/0.3, speed 0.45-1.6, 4 hand drops |
-| s2 | 2026-09-28 | small | distill from round 5 + xstrong augmentation | 80 | running | | selia097 |
+| s2 | 2026-09-28 | small | distill from round 5 + xstrong augmentation | 80 | **0.1735** | 2.6 (selia097) | beats the 17.9 target and its own teacher (0.204) |
+| 9 | 2026-09-28 | large | self-distillation from round 5 + xstrong, 100 epochs | 100 | running | | selia097; s2 showed distillation regularises strongly |
 
 ## Stress tests (dev WER: plain / one hand hidden 0.5-1.5 s, ~1/3 of frames / 1.5x faster)
 
@@ -39,3 +40,4 @@ signers, 1 dev signer (model selection), 4 test signers (evaluated once, at the 
 | 5 | 0.204 | 0.214 | 0.206 |
 | 6 | 0.241 | 0.263 | 0.228 |
 | s1 | 0.268 | 0.297 | 0.248 |
+| s2 | 0.173 | 0.180 | 0.167 |
