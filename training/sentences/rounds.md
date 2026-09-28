@@ -21,3 +21,9 @@ signers, 1 dev signer (model selection), 4 test signers (evaluated once, at the 
 | 2 | 2026-09-28 | large | no pre-training (vs round 1) | 60 | 0.893 | 1.6 (mono768) | never leaves the all-blank solution (loss stuck ~5.2): pre-training is required |
 | 3 | 2026-09-28 | large | strong augmentation (vs round 1) | 60 | running | | rot 25/15, scale 0.3/0.2, speed 0.6-1.4, 2x longer/more hand drops |
 | 4 | 2026-09-28 | large | dropout 0.1 -> 0.3 (vs round 1) | 60 | running | | parallel with 3 on mono768 |
+
+## Stress tests (dev WER: plain / one hand hidden 0.5-1.5 s, ~1/3 of frames / 1.5x faster)
+
+| Round | Plain | Hidden hand | Fast |
+| --- | --- | --- | --- |
+| 1 | 0.262 | 0.309 | 0.250 |
