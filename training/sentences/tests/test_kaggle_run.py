@@ -33,3 +33,15 @@ def test_other_account(tmp_path):
     assert json.load(open(tmp_path / "kernel-metadata.json"))["id"] == "selia097/sli-sent-r2"
     env = K.account_env(2)
     assert env["KAGGLE_API_TOKEN"].startswith("KGAT_") and K.ACCOUNTS[2][0] == "selia097"
+
+
+def test_bundles_wheels_for_offline_install(tmp_path, monkeypatch):
+    # teammate accounts may have no internet in kernels: pose-format must install offline
+    wheels = tmp_path / "wheels"
+    wheels.mkdir()
+    (wheels / "pose_format-0.15.0-py3-none-any.whl").write_bytes(b"x")
+    monkeypatch.setattr(K, "WHEELS", str(wheels))
+    names = tarfile.open(fileobj=io.BytesIO(base64.b64decode(K.bundle())), mode="r:gz").getnames()
+    assert "wheels/pose_format-0.15.0-py3-none-any.whl" in names
+    K.write_kernel(tmp_path / "k", "x", "training.sentences.hello", gpu=False, datasets=[], kernels=[])
+    assert "--no-index" in (tmp_path / "k" / "run.py").read_text()

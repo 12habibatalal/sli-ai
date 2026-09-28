@@ -32,12 +32,18 @@ def account_env(n):
     env = dict(os.environ)
     env["KAGGLE_API_TOKEN"] = open(os.path.expanduser(ACCOUNTS[n][1])).read().strip()
     return env
-PIP = "pose-format onnx onnxruntime"
+PIP = "onnx onnxruntime"  # optional extras, need internet in the kernel
+WHEELS = os.path.expanduser("~/sli-work/wheels")  # bundled and installed offline (pose-format)
 
 # /kaggle/src (where the script lives) is read-only, so the code is unpacked into /tmp/sli.
-RUN = '''import base64, io, os, subprocess, sys, tarfile
+# Accounts without internet in kernels still get the bundled wheels.
+RUN = '''import base64, glob, io, os, subprocess, sys, tarfile
 tarfile.open(fileobj=io.BytesIO(base64.b64decode(BUNDLE)), mode="r:gz").extractall("/tmp/sli", filter="data")
-subprocess.run([sys.executable, "-m", "pip", "install", "-q", *"{pip}".split()], check=False)
+wheels = glob.glob("/tmp/sli/wheels/*.whl")
+if wheels:
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "--no-index", "--no-deps", *wheels], check=False)
+subprocess.run([sys.executable, "-m", "pip", "install", "-q", "--timeout", "10", "--retries", "0", *"{pip}".split()],
+               check=False)
 os.environ["SLI_OUT"] = "/kaggle/working"
 os.chdir("/tmp/sli")
 subprocess.run(["find", "/kaggle/input", "-maxdepth", "4", "-type", "d"], check=False)
@@ -54,6 +60,8 @@ def bundle():
 
     with tarfile.open(fileobj=buf, mode="w:gz") as tar:
         tar.add(os.path.join(ROOT, "training"), arcname="training", filter=skip)
+        for whl in sorted(glob.glob(os.path.join(WHEELS, "*.whl"))):
+            tar.add(whl, arcname=f"wheels/{os.path.basename(whl)}")
     return base64.b64encode(buf.getvalue()).decode()
 
 
