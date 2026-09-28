@@ -43,3 +43,16 @@ signers, 1 dev signer (model selection), 4 test signers (evaluated once, at the 
 | s2 | 0.173 | 0.180 | 0.167 |
 | 7 | 0.176 | 0.191 | 0.169 |
 | 8 | 0.181 | 0.185 | 0.178 |
+
+## No face (signer far from the camera; the app's FaceLandmarker misses small faces)
+
+Found by the e2e test: on a wide ArabSign frame FaceLandmarker finds no face (0/15 frames) while
+pose and hands are found; cropped to phone-like framing it finds 15/15. Training data (Holistic)
+almost always has a face. Cost of losing the face entirely (dev WER, exported ONNX):
+
+| Model | Plain | No face |
+| --- | --- | --- |
+| large r7 | 0.1758 | 0.1875 |
+| small s2 | 0.1735 | 0.1940 |
+
+1-2 points: no special retraining. The e2e camera uses phone-like framing.
