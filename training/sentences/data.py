@@ -39,6 +39,35 @@ def augment(x, rng):
     return x
 
 
+def stress(x, kind, rng):
+    """Harder versions of a test clip, for evaluation only.
+
+    hand: one hand at a time disappears for 0.5-1.5 s stretches covering about a third of the
+          clip, as when a hand passes behind the other (the arms stay tracked);
+    fast: the same signing 1.5 times faster.
+    """
+    x = np.array(x, np.float32, copy=True)
+    T = len(x)
+    if kind == "fast":
+        return F.resample(x, np.arange(T) * (1000.0 / F.FPS) / 1.5)
+    if kind != "hand":
+        raise ValueError(kind)
+    hidden = np.zeros(T, bool)
+    for _ in range(200):
+        room = int(0.4 * T) - hidden.sum()
+        if hidden.sum() >= 0.3 * T or room < 8:
+            break
+        n = min(int(rng.integers(8, 23)), room)
+        s = int(rng.integers(0, max(T - n, 0) + 1))
+        if hidden[max(s - 1, 0):s + n + 1].any():  # keep stretches apart: one hand at a time
+            continue
+        o, k = (F.O_LH, 2) if rng.random() < 0.5 else (F.O_RH, 3)
+        x[s:s + n, o:o + 42] = 0
+        x[s:s + n, F.O_PRES + k] = 0
+        hidden[s:s + n] = True
+    return x
+
+
 class SeqDataset(torch.utils.data.Dataset):
     def __init__(self, feats, items, train, seed=0):
         self.feats, self.items, self.train = feats, items, train

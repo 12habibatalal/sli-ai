@@ -34,6 +34,20 @@ def evaluate_split(model, feats, items, device):
     return ctc.wer(refs, hyps)
 
 
+def stress_report(model, ckpt, feats, items, device, out_path):
+    """Dev WER of the best checkpoint: as is, with a hand hidden in stretches, and 1.5x faster."""
+    model.load_state_dict(torch.load(ckpt, map_location="cpu")["state"])
+    model.to(device)
+    report = {"plain": evaluate_split(model, feats, items, device)}
+    for kind in ("hand", "fast"):
+        rng = np.random.default_rng(0)
+        hard = {k: D.stress(np.asarray(feats[k], np.float32), kind, rng) for k, _ in items}
+        report[kind] = evaluate_split(model, hard, items, device)
+    print("stress:", json.dumps(report), flush=True)
+    json.dump(report, open(out_path, "w"))
+    return report
+
+
 def _seed_worker(worker_id):
     info = torch.utils.data.get_worker_info()
     info.dataset.rng = np.random.default_rng(torch.initial_seed() % 2**32)
@@ -170,6 +184,7 @@ def main():
     fit(m, feats, tr, feats, dv, a.epochs, a.lr, a.max_frames, device, log=log, ckpt=ckpt, teacher=teacher,
         alpha=a.alpha, workers=a.workers,
         meta={"config": a.model, "arch": M.CONFIGS[a.model], "n_classes": C, "protocol": a.protocol})
+    stress_report(m, ckpt, feats, dv, device, os.path.join(OUT, name + ".stress.json"))
 
 
 if __name__ == "__main__":
