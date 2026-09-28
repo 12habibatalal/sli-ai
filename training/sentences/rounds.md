@@ -21,9 +21,13 @@ signers, 1 dev signer (model selection), 4 test signers (evaluated once, at the 
 | 2 | 2026-09-28 | large | no pre-training (vs round 1) | 60 | 0.893 | 1.6 (mono768) | never leaves the all-blank solution (loss stuck ~5.2): pre-training is required |
 | 3 | 2026-09-28 | large | strong augmentation (vs round 1) | 60 | **0.215** | 1.7 (baraasaad) | rot 25/15, scale 0.3/0.2, speed 0.6-1.4, more/longer hand drops. Best so far |
 | 4 | 2026-09-28 | large | dropout 0.1 -> 0.3 (vs round 1) | 60 | 0.261 | 1.8 (mono768) | no gain: dropped |
-| 5 | 2026-09-28 | large | xstrong augmentation (vs round 3) | 60 | running | | rot 35/20, scale 0.4/0.25, speed 0.5-1.5, 3 hand drops up to 1.5 s |
-| 6 | 2026-09-28 | large | strong augmentation + dropout 0.2 (vs round 3) | 60 | running | | mono768 |
+| 5 | 2026-09-28 | large | xstrong augmentation (vs round 3) | 60 | **0.204** | 1.7 (baraasaad) | best so far; still improving at epoch 59; rot 35/20, scale 0.4/0.25, speed 0.5-1.5, 3 hand drops up to 1.5 s |
+| 6 | 2026-09-28 | large | strong augmentation + dropout 0.2 (vs round 3) | 60 | 0.241 | 1.7 (mono768) | dropout hurts: dropped for good |
 | s0 | 2026-09-28 | small | KArSL pre-training | 30 | 0.010 (KArSL test, seen signers) | 0.6 (selia097) | init for small rounds |
+| s1 | 2026-09-28 | small | Isharah, init s0, normal augmentation (plain baseline) | 60 | 0.268 | 1.5 (selia097) | baseline for distillation |
+| 7 | 2026-09-28 | large | xstrong, 100 epochs (vs round 5) | 100 | running | | baraasaad |
+| 8 | 2026-09-28 | large | xxstrong, 100 epochs (vs round 7) | 100 | running | | mono768; rot 45/25, scale 0.5/0.3, speed 0.45-1.6, 4 hand drops |
+| s2 | 2026-09-28 | small | distill from round 5 + xstrong augmentation | 80 | running | | selia097 |
 
 ## Stress tests (dev WER: plain / one hand hidden 0.5-1.5 s, ~1/3 of frames / 1.5x faster)
 
@@ -32,3 +36,6 @@ signers, 1 dev signer (model selection), 4 test signers (evaluated once, at the 
 | 1 | 0.262 | 0.309 | 0.250 |
 | 3 | 0.215 | 0.228 | 0.214 |
 | 4 | 0.261 | 0.298 | 0.239 |
+| 5 | 0.204 | 0.214 | 0.206 |
+| 6 | 0.241 | 0.263 | 0.228 |
+| s1 | 0.268 | 0.297 | 0.248 |
