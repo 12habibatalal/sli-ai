@@ -1,5 +1,6 @@
-// Camera -> landmarks (worker) -> Interpreter (words, letters or both). One engine per page
-// that signs; the models behind it are loaded once and shared.
+// Camera -> landmarks (worker) -> Interpreter (words, letters or both), or in sentences mode
+// -> SentenceRecognizer (phone sentence model in a worker + the large model on the server).
+// One engine per page that signs; the models behind it are loaded once and shared.
 //
 // The main thread only grabs frames and draws. MediaPipe runs in one worker and the word model
 // in another, so neither the camera view nor the landmark rate waits on a classification.
@@ -12,20 +13,29 @@ import { LetterClassifier } from './letters';
 import type { Guess } from './topk';
 import type { LandmarksReply, LandmarksRequest } from './landmarks.worker';
 import type { ClassifierReply, ClassifierRequest } from './classifier.worker';
+import { DEFAULT_SENTENCE, SentenceRecognizer, type SentenceResult } from './sentences';
+import type { SentenceVocab } from './sentenceModel';
+import type { SentenceWorkerReply, SentenceWorkerRequest } from './sentence.worker';
 
 export interface EngineEvents extends DecoderEvents {
   onFrame?(raw: RawFrame, fps: number): void;
   onStatus?(status: EngineStatus, detail?: string): void;
+  onSentenceLive?(r: SentenceResult): void;
+  onSentence?(r: SentenceResult): void;
 }
 
 export type EngineStatus = 'loading' | 'ready' | 'running' | 'stopped' | 'error';
 export type { SignMode } from './interpreter';
+export type { SentenceResult } from './sentences';
 
 const params = new URLSearchParams(location.search);
 
-// ?debug keeps every raw frame on window.__sliFrames (used by the end-to-end probes).
+// ?debug keeps every raw frame on window.__sliFrames and every sentence on
+// window.__sliSentences (used by the end-to-end probes).
 const debugFrames: { t: number; raw: RawFrame; ms: number }[] | null = params.has('debug') ? [] : null;
 if (debugFrames) Object.assign(window, { __sliFrames: debugFrames });
+const sentenceLog: SentenceResult[] | null = params.has('debug') ? [] : null;
+if (sentenceLog) Object.assign(window, { __sliSentences: sentenceLog });
 
 // ?timescale=N stretches every decoder timing N times. Tests use it with a camera video slowed
 // down N times to emulate a fast device on a slow test machine.
@@ -150,12 +160,53 @@ async function widestView(stream: MediaStream) {
   }
 }
 
+// Workers resolve relative URLs against their own script, so hand them an absolute base.
+const modelBase = () => new URL(import.meta.env.BASE_URL, location.href).href;
+
+let sentenceShared: Promise<{ run: (feats: Float32Array, T: number) => Promise<{ ids: number[]; conf: number[] }>; vocab: SentenceVocab }> | null = null;
+
+/** The phone sentence model (its own worker) and vocabulary, loaded on first use of sentences mode. */
+function loadSentenceModel() {
+  const base = modelBase();
+  sentenceShared ??= (() => {
+    const worker = new Worker(new URL('./sentence.worker.ts', import.meta.url), { type: 'module' });
+    const pending = new Map<number, (r: { ids: number[]; conf: number[] }) => void>();
+    let nextId = 0;
+    const run = (feats: Float32Array, T: number) =>
+      new Promise<{ ids: number[]; conf: number[] }>((resolve) => {
+        const id = nextId++;
+        pending.set(id, resolve);
+        const request: SentenceWorkerRequest = { type: 'run', id, feats, T };
+        worker.postMessage(request, [feats.buffer]);
+      });
+    const ready = new Promise<void>((resolve, reject) => {
+      worker.onmessage = (e: MessageEvent<SentenceWorkerReply>) => {
+        const m = e.data;
+        if (m.type === 'ready') resolve();
+        else if (m.type === 'result') {
+          pending.get(m.id)?.(m);
+          pending.delete(m.id);
+        } else if (m.id !== undefined) {
+          console.error('sentence model:', m.message);
+          pending.get(m.id)?.({ ids: [], conf: [] });
+          pending.delete(m.id);
+        } else reject(new Error(m.message));
+      };
+      const request: SentenceWorkerRequest = { type: 'init', base };
+      worker.postMessage(request);
+    });
+    const vocab = fetch(`${base}models/sentences-vocab.json`).then((r) => r.json() as Promise<SentenceVocab>);
+    return Promise.all([vocab, ready]).then(([v]) => ({ run, vocab: v }));
+  })();
+  sentenceShared.catch(() => (sentenceShared = null));
+  return sentenceShared;
+}
+
 /** Loads models once per page load; later callers reuse them. */
 export function loadModels(onProgress?: (step: string) => void) {
   progress = onProgress;
-  // Workers resolve relative URLs against their own script, so hand them an absolute base.
-  const base = new URL(import.meta.env.BASE_URL, location.href).href;
-  shared ??= Promise.all([startLandmarks(base), startClassifier(base), LetterClassifier.load(base)]).then(
+  const base = modelBase();
+  shared ??=Promise.all([startLandmarks(base), startClassifier(base), LetterClassifier.load(base)]).then(
     ([landmarks, classify, letters]) => ({ landmarks, classify, letters }),
   );
   shared.catch(() => (shared = null));
@@ -174,6 +225,7 @@ export class Engine {
   private lastResultAt = -1;
   private fps = 0;
   private mode: SignMode = 'auto';
+  private sentences: Promise<SentenceRecognizer> | null = null;
 
   constructor(
     private video: HTMLVideoElement,
@@ -184,6 +236,23 @@ export class Engine {
     this.mode = mode;
     this.frameNo = 0;
     this.interpreter?.setMode(mode);
+    if (mode === 'sentences') {
+      this.sentences ??= loadSentenceModel().then(
+        ({ run, vocab }) =>
+          new SentenceRecognizer(run, vocab, {
+            onLive: (r) => this.events.onSentenceLive?.(r),
+            onSentence: (r) => {
+              sentenceLog?.push(r);
+              this.events.onSentence?.(r);
+            },
+          }, DEFAULT_SENTENCE),
+      );
+      this.sentences.catch((err) => {
+        this.sentences = null;
+        this.events.onStatus?.('error', err instanceof Error ? err.message : String(err));
+      });
+    }
+    void this.sentences?.then((r) => r.reset());
   }
 
   async start() {
@@ -243,7 +312,7 @@ export class Engine {
         // Letters are hand shapes only; words need the body and face too.
         if (this.fps > 0 && this.fps < SLOW_FPS) this.bodyEvery = 2;
         else if (this.fps > FAST_FPS) this.bodyEvery = 1;
-        const needsBody = this.interpreter?.needsBody ?? this.mode !== 'letters';
+        const needsBody = this.mode === 'sentences' || (this.interpreter?.needsBody ?? this.mode !== 'letters');
         const body = needsBody && this.frameNo++ % (BODY_EVERY || this.bodyEvery) === 0;
         const request: LandmarksRequest = { type: 'frame', bitmap, t, body, face: body };
         worker.postMessage(request, [bitmap]);
@@ -270,15 +339,20 @@ export class Engine {
     if (debugFrames) debugFrames.push({ t, raw, ms: m.ms });
     this.events.onFrame?.(raw, this.fps);
     // Not awaited: the decoder skips steps while a classification is still running.
-    void this.interpreter?.push(t, raw);
+    // Sentences get real-time timestamps: under ?timescale the camera video is slowed down, and
+    // the sentence model must see signing at its true speed.
+    if (this.mode === 'sentences') void this.sentences?.then((r) => r.push(t / timescale, raw));
+    else void this.interpreter?.push(t, raw);
   };
 
   resetSentence() {
     this.interpreter?.reset();
+    void this.sentences?.then((r) => r.reset());
   }
 
   stop() {
     this.running = false;
+    void this.sentences?.then((r) => r.reset());
     this.models?.landmarks.removeEventListener('message', this.onResult);
     this.stream?.getTracks().forEach((t) => t.stop());
     this.stream = null;

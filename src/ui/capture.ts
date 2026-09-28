@@ -1,7 +1,8 @@
 // Camera stage + skeleton overlay + live guess, feeding a Sentence. Modes: auto (words and
-// spelled letters mixed), words only, letters only (see recognition/interpreter.ts).
+// spelled letters mixed), words only, letters only (see recognition/interpreter.ts), and
+// sentences (whole signed sentences, recognition/sentences.ts), shown in their own line.
 
-import { Engine, type EngineStatus, type SignMode } from '../recognition/engine';
+import { Engine, type EngineStatus, type SentenceResult, type SignMode } from '../recognition/engine';
 import type { Commit } from '../recognition/decoder';
 import type { Guess } from '../recognition/topk';
 import { signById } from '../data/signs';
@@ -11,7 +12,7 @@ import { FramingCoach, type FramingIssue } from '../recognition/framing';
 import { h, icon } from './dom';
 import type { Sentence } from './sentence';
 
-const MODES: SignMode[] = ['auto', 'words', 'letters'];
+const MODES: SignMode[] = ['auto', 'words', 'letters', 'sentences'];
 
 function storedMode(): SignMode {
   try {
@@ -41,10 +42,14 @@ export class Capture {
   private coach = new FramingCoach();
   private issue: FramingIssue | null = null;
   private lastCommitted = -1; // not previewed again while it is still being held
+  private sentenceText = h('span', {});
+  private sentenceFrom = h('small', { class: 'sentence-from' });
+  private sentenceOut = h('p', { class: 'sentence-result', 'aria-live': 'polite', hidden: true }, this.sentenceText, this.sentenceFrom);
 
   constructor(
     private sentence: Sentence,
     private onCommit: (c: Commit) => void = () => {},
+    private onSentence: (text: string) => void = () => {},
   ) {
     this.toggleBtn = h('button', { class: 'btn primary', onclick: () => this.toggle() });
     this.modeButtons = MODES.map((m) =>
@@ -65,6 +70,7 @@ export class Capture {
       h('div', { class: 'mode-switch', role: 'group', 'aria-label': t().modeLabel }, ...this.modeButtons),
       this.stage,
       this.hint,
+      this.sentenceOut,
       h('div', { class: 'capture-actions' }, this.toggleBtn, h('a', { class: 'btn ghost', href: '#/teach' }, icon('hand'), t().teachLink)),
     );
     this.engine = new Engine(this.video, {
@@ -93,6 +99,11 @@ export class Capture {
         this.sentence.setPending(null);
         this.sentence.endWord();
       },
+      onSentenceLive: (r) => {
+        this.live.classList.remove('committed');
+        this.live.textContent = r.text;
+      },
+      onSentence: (r) => this.showSentence(r),
     });
     this.setMode(this.mode);
     this.renderButton();
@@ -121,11 +132,25 @@ export class Capture {
     }
     this.modeButtons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === mode)));
     this.hint.textContent = t().modeHints[mode];
+    this.sentenceOut.hidden = mode !== 'sentences' || !this.sentenceText.textContent;
     this.engine.setMode(mode);
     this.sentence.setPending(null);
     this.sentence.endWord();
     this.lastCommitted = -1;
     this.live.textContent = '';
+  }
+
+  get currentMode(): SignMode {
+    return this.mode;
+  }
+
+  private showSentence(r: SentenceResult) {
+    this.live.textContent = '';
+    this.sentenceText.textContent = r.text;
+    this.sentenceFrom.textContent = r.text ? t().sentenceFrom[r.source] : '';
+    this.sentenceOut.dataset.source = r.source;
+    this.sentenceOut.hidden = !r.text;
+    this.onSentence(r.text);
   }
 
   private showLive(guesses: Guess[]) {

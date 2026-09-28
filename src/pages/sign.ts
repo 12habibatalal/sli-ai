@@ -14,14 +14,24 @@ export function mountSign(root: HTMLElement) {
     }
   })();
 
-  const speakBtn = h('button', { class: 'btn primary', onclick: () => speak(sentence.text()) }, icon('speaker'), t().speakSentence);
+  let signed = ''; // the last whole sentence (sentences mode)
+  const toSpeak = () => (capture.currentMode === 'sentences' ? signed : sentence.text());
+  const speakBtn = h('button', { class: 'btn primary', onclick: () => speak(toSpeak()) }, icon('speaker'), t().speakSentence);
   const sentence = new Sentence((text) => {
     speakBtn.disabled = !text;
   });
-  const capture = new Capture(sentence, (c) => {
-    const s = signById(c.id);
-    if (autoSpeak && s.cat !== 'letters') void speak(s.ar);
-  });
+  const capture = new Capture(
+    sentence,
+    (c) => {
+      const s = signById(c.id);
+      if (autoSpeak && s.cat !== 'letters') void speak(s.ar);
+    },
+    (text) => {
+      signed = text;
+      speakBtn.disabled = !text;
+      if (autoSpeak && text) void speak(text);
+    },
+  );
 
   const auto = h('input', { type: 'checkbox', id: 'autospeak' });
   auto.checked = autoSpeak;

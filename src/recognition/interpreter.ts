@@ -14,7 +14,9 @@ import { DEFAULT_SPELLER, Speller, type SpellerOptions } from './speller';
 import type { LetterClassifier, LetterStream } from './letters';
 import type { Guess } from './topk';
 
-export type SignMode = 'auto' | 'words' | 'letters';
+// 'sentences' is handled by the engine (recognition/sentences.ts); the Interpreter gets no
+// frames in that mode.
+export type SignMode = 'auto' | 'words' | 'letters' | 'sentences';
 
 export interface InterpreterOptions {
   decoder: DecoderOptions;
