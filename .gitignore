@@ -2,7 +2,8 @@ node_modules/
 dist/
 public/runtime/
 training/cache/
-training/__pycache__/
+__pycache__/
+.pytest_cache/
 test-results/
 playwright-report/
 *.log

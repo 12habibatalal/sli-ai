@@ -9,9 +9,7 @@ port lives in src/recognition/features.ts and must stay in sync with this file.
 import json
 import os
 
-import mediapipe as mp
 import numpy as np
-from mediapipe.tasks.python import BaseOptions, vision
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 LANDMARKERS = os.environ.get("SLI_LANDMARKERS", os.path.join(HERE, "..", "public", "mediapipe"))
@@ -42,6 +40,9 @@ def _dist(lms, pair):
 
 class Extractor:
     def __init__(self, num_hands=1):
+        # Imported here so features() works without mediapipe (training/sentences uses it).
+        from mediapipe.tasks.python import BaseOptions, vision
+
         def opts(name):
             return BaseOptions(model_asset_path=os.path.join(LANDMARKERS, f"{name}_landmarker.task"))
 
@@ -55,6 +56,8 @@ class Extractor:
 
     def raw(self, frame_rgb):
         """Return raw landmarks as plain lists so they can be saved and replayed."""
+        import mediapipe as mp
+
         image = mp.Image(image_format=mp.ImageFormat.SRGB, data=np.ascontiguousarray(frame_rgb))
         pose = self.pose.detect(image)
         face = self.face.detect(image)
