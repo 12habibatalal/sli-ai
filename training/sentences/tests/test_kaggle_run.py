@@ -45,3 +45,10 @@ def test_bundles_wheels_for_offline_install(tmp_path, monkeypatch):
     assert "wheels/pose_format-0.15.0-py3-none-any.whl" in names
     K.write_kernel(tmp_path / "k", "x", "training.sentences.hello", gpu=False, datasets=[], kernels=[])
     assert "--no-index" in (tmp_path / "k" / "run.py").read_text()
+
+
+def test_find_input_honours_sli_input(tmp_path, monkeypatch):
+    (tmp_path / "isharah" / "SI").mkdir(parents=True)
+    (tmp_path / "isharah" / "SI" / "train.txt").write_text("id|gloss|text\n")
+    monkeypatch.setenv("SLI_INPUT", str(tmp_path))
+    assert K.find_input("SI/train.txt") == str(tmp_path / "isharah" / "SI" / "train.txt")

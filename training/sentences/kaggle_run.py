@@ -18,7 +18,7 @@ import time
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 KAGGLE = os.path.expanduser("~/sli-work/kvenv/bin/kaggle")
-USER = "baraasaad"
+USER = os.environ.get("SLI_KAGGLE_USER", "baraasaad")  # your Kaggle username
 # --account N: (username, token file). 2 and 3 are teammates' accounts lent to the project.
 ACCOUNTS = {
     1: (USER, "~/.kaggle/access_token"),
@@ -77,8 +77,9 @@ def write_kernel(d, name, entry, gpu, datasets, kernels, args="", user=USER):
 
 
 def find_input(pattern):
-    """First match of pattern under /kaggle/input (inside a kernel)."""
-    hits = sorted(glob.glob(os.path.join("/kaggle/input", "**", pattern), recursive=True))
+    """First match of pattern under $SLI_INPUT (default /kaggle/input, as inside a kernel)."""
+    root = os.environ.get("SLI_INPUT", "/kaggle/input")
+    hits = sorted(glob.glob(os.path.join(root, "**", pattern), recursive=True))
     if not hits:
         raise FileNotFoundError(pattern)
     return hits[0]

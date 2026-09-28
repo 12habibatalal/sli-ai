@@ -146,6 +146,7 @@ def main():
     ap.add_argument("--workers", type=int, default=3)
     ap.add_argument("--aug", default="normal", choices=sorted(D.AUG))
     ap.add_argument("--dropout", type=float, default=0.1)
+    ap.add_argument("--keep-head", action="store_true", help="keep --init's CTC head (fine-tuning an Isharah checkpoint)")
     ap.add_argument("--data")
     a = ap.parse_args()
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -179,7 +180,8 @@ def main():
     m = M.build(a.model, C, dropout=a.dropout)
     if a.init:
         state = torch.load(_resolve(a.init), map_location="cpu")["state"]
-        state = {k: v for k, v in state.items() if not k.startswith("head.")}
+        if not a.keep_head:
+            state = {k: v for k, v in state.items() if not k.startswith("head.")}
         print("init:", m.load_state_dict(state, strict=False), flush=True)
     teacher = None
     if a.stage == "distill":

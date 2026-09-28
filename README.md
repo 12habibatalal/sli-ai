@@ -51,13 +51,15 @@ Word error rate (WER) is measured on the Isharah signer-independent dev split, w
 
 | Model | Runs | Size | WER | One hand hidden | 1.5× faster | No face |
 | --- | --- | --- | --- | --- | --- | --- |
-| **SLI Sentences Large v2** (`large-v2`) | server, `POST /api/sentence` | 169 MB, 43M params | 17.5% | 18.0% | 16.8% | 19.2% |
+| **SLI Sentences Large v2** (`large-v2`) | server, `POST /api/sentence` | 169 MB, 42M params | 17.5% | 18.0% | 16.8% | 19.2% |
 | **SLI Sentences Phone v1** (`sentences-small.onnx`) | in the browser, offline | 17.9 MB | 17.4% | 18.0% | 16.7% | 19.4% |
 
 The app sends each sentence to the server model and falls back to the phone model when the server
 is slow (4 s) or unreachable. The phone model learnt from a large teacher (distillation), so the two
-score about the same. For comparison, the best published Isharah signer-independent dev result is 17.9% (Swin-MSTP).
+score about the same. For comparison, the best signer-independent dev result in the Isharah paper is 17.9% (Swin-MSTP, RGB video),
+and the best pose-based entry in the MSLR 2025 challenge reached 7.3%, so there is room to improve.
 Training rounds and stress tests: `training/sentences/rounds.md`. Licence of both models: CC-BY-NC-SA-4.0 (from Isharah).
+Weights (ONNX and PyTorch): [DF-Team/sli-sentences](https://huggingface.co/DF-Team/sli-sentences) on Hugging Face.
 
 ## Measured accuracy
 
@@ -102,6 +104,11 @@ npx playwright test
 `?handsMode=video` / `?body=image` change the per-part tracking modes, `?hands=1` tracks one hand, `?bodyEvery=N` fixes how
 often pose and face are refreshed, and `?debug` keeps raw landmarks on `window.__sliFrames`.
 
+## Contributing
+
+Issues and pull requests are welcome, especially better sentence models. [CONTRIBUTING.md](CONTRIBUTING.md) covers
+the data, the training commands and how models are compared.
+
 ## Credits
 
 - **Digital Fingers team** — Anas Mohamed Mokhtar, Iyad Abdel Raouf Samir.
@@ -109,3 +116,8 @@ often pose and face are refreshed, and `?debug` keeps raw landmarks on `window._
   ACM TALLIP 20(1), 2021. Sign videos and labels.
 - **Word-level ArSL ST-Transformer** — Yousef Elkilany, MIT License.
 - **MediaPipe** (Apache 2.0) and **ONNX Runtime Web** (MIT).
+
+## Licence
+
+Code: MIT ([LICENSE](LICENSE)). Model files keep the licences of their sources: the sentence models are
+CC BY-NC-SA 4.0 (from Isharah) and the word model is MIT (Yousef Elkilany).
