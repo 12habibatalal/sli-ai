@@ -61,6 +61,14 @@ and the best pose-based entry in the MSLR 2025 challenge reached 7.3%, so there 
 Training rounds and stress tests: `training/sentences/rounds.md`. Licence of both models: CC-BY-NC-SA-4.0 (from Isharah).
 Weights (ONNX and PyTorch): [DF-Team/sli-sentences](https://huggingface.co/DF-Team/sli-sentences) on Hugging Face.
 
+
+### Improved large sentence model (experimental)
+
+- Model: [isharah-large-US.onnx](https://huggingface.co/DF-Team/sli-sentences/blob/main/isharah-large-US.onnx)
+- Evaluation protocol: US/dev — WER 11.31%, sentence accuracy 79.85% (650 samples).
+- Evaluation protocol: SI/dev — WER 13.27%, sentence accuracy 74.30% (1,000 samples).
+- These are development-set results, not final test-set results. The target WERs (<8% Large, <10% Small) have not yet been met.
+
 ## Measured accuracy
 
 On the KArSL **test** split (details and method in `training/README.md`):
